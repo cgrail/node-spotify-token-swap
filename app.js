@@ -1,21 +1,14 @@
-/**
- * If we have a new relic license key, we'll use it.
- * This is useful for keeping Heroku instances online.
- */
-if (!!process.env.NEW_RELIC_LICENSE_KEY) {
-    require('newrelic');
-}
+var config = require('./config').config;
 
 if (
-    !process.env.CLIENT_ID ||
-        !process.env.CLIENT_SECRET ||
-        !process.env.CALLBACK_URI
+    !config.clientId ||
+    !config.clientSecret ||
+    !config.callbackUri
 ) {
     console.log(
         '[' + new Date().toISOString() + ']',
-        'Environment variables not set up correctly. Please set CLIENT_ID,' +
-            'CLIENT_SECRET and CALLBACK_URI in the environment this app is running in.' +
-            'For help, see README'
+        'Config variables not set up correctly. Please setup the config.js file' +
+        ' in the environment this app is running in.'
     );
 
     process.exit(1);
@@ -33,14 +26,14 @@ var app = express();
  * Your client ID and secret can be found in your app
  * settings in Spotify Developer.
  */
-var clientId = process.env.CLIENT_ID;
-var clientSecret = process.env.CLIENT_SECRET;
-var clientCallback = process.env.CALLBACK_URI;
+var clientId = config.clientId;
+var clientSecret = config.clientSecret;
+var clientCallback = config.callbackUri;
 var authString = new Buffer(clientId + ':' + clientSecret).toString('base64');
 var authorizationHeader = 'Basic ' + authString;
 var bodyParser = require('body-parser');
 
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({extended: true}));
 
 var spotifyEndpoint = 'https://accounts.spotify.com/api/token';
 
@@ -52,25 +45,27 @@ var spotifyEndpoint = 'https://accounts.spotify.com/api/token';
  */
 app.post('/swap', function (req, res, next) {
     var formData = {
-            grant_type : 'authorization_code',
-            redirect_uri : clientCallback,
-            code : req.body.code
+            grant_type: 'authorization_code',
+            redirect_uri: clientCallback,
+            code: req.body.code
         },
         options = {
-            uri : url.parse(spotifyEndpoint),
-            headers : {
-                'Authorization' : authorizationHeader
+            uri: url.parse(spotifyEndpoint),
+            headers: {
+                'Authorization': authorizationHeader
             },
-            form : formData,
-            method : 'POST',
-            json : true
+            form: formData,
+            method: 'POST',
+            json: true
         };
+
+    console.log(options);
 
     request(options, function (error, response, body) {
         if (response.statusCode === 200) {
             body.refresh_token = encrpytion.encrypt(body.refresh_token);
         }
-        
+
         res.status(response.statusCode);
         res.json(body);
 
@@ -87,23 +82,23 @@ app.post('/swap', function (req, res, next) {
  */
 app.post('/refresh', function (req, res, next) {
     if (!req.body.refresh_token) {
-        res.status(400).json({ error : 'Refresh token is missing from body' });
+        res.status(400).json({error: 'Refresh token is missing from body'});
         return;
     }
 
     var refreshToken = encrpytion.decrypt(req.body.refresh_token),
         formData = {
-            grant_type : 'refresh_token',
-            refresh_token : refreshToken
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken
         },
         options = {
-            uri : url.parse(spotifyEndpoint),
-            headers : {
-                'Authorization' : authorizationHeader
+            uri: url.parse(spotifyEndpoint),
+            headers: {
+                'Authorization': authorizationHeader
             },
-            form : formData,
-            method : 'POST',
-            json : true
+            form: formData,
+            method: 'POST',
+            json: true
         };
 
     request(options, function (error, response, body) {
@@ -136,11 +131,8 @@ app.get('/', function (req, res, next) {
  * in the environment variables.
  */
 app.use(function (req, res) {
-    if (!!process.env.ACCESS_LOG && process.env.ACCESS_LOG == 'off') {
-        return;
-    }
 
-    var ip = req.headers["x-forwarded-for"] || req.ip;
+    var ip = req.headers['x-forwarded-for'] || req.ip;
 
     var accessParts = [
         req.method.toUpperCase(),
@@ -154,12 +146,12 @@ app.use(function (req, res) {
         '[Client: ' + ip + ']',
         '"' + accessParts.join(' ') + '"',
         res.statusCode,
-        '"' + req.headers["user-agent"] + '"',
+        '"' + req.headers['user-agent'] + '"',
     ];
 
     console.log(parts.join(' '));
 });
 
-var server = app.listen(process.env.PORT || 4343, function () {
-    console.log('[' + new Date().toISOString() + ']', 'Spotify token swap app listening on port ', process.env.PORT || 4343);
+var server = app.listen(config.processPort || 4343, function () {
+    console.log('[' + new Date().toISOString() + ']', 'Spotify token swap app listening on port ', config.processPort || 4343);
 });

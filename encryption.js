@@ -1,6 +1,6 @@
 var crypto = require('crypto');
 var randomstring = require('randomstring');
-var encSecret = process.env.ENCRYPTION_SECRET || randomstring.generate(30);
+var encSecret = randomstring.generate(30);
 
 /**
  * Uses encryption secret defined in environment to encrypt
